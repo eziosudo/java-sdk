@@ -462,7 +462,13 @@ public class HttpClientStreamableHttpTransport implements McpClientTransport {
 						.orElse("")
 						.toLowerCase();
 
-					if (contentType.isBlank()) {
+					String contentLength = responseEvent.responseInfo()
+							.headers()
+							.firstValue("Content-Length")
+							.orElse("")
+							.toLowerCase();
+
+					if (contentType.isBlank() || "0".equals(contentLength)) {
 						logger.debug("No content type returned for POST in session {}", sessionRepresentation);
 						// No content type means no response body, so we can just
 						// return
@@ -515,6 +521,15 @@ public class HttpClientStreamableHttpTransport implements McpClientTransport {
 									"Error deserializing JSON-RPC message: " + responseEvent, e));
 						}
 					}
+
+					if (sentMessage instanceof McpSchema.JSONRPCNotification) {
+						logger.warn(
+								"Notification {} received unsupported Content-Type '{}' (status={}) in session {}; ignoring response.",
+								sentMessage, contentType, statusCode, sessionRepresentation);
+						deliveredSink.success();
+						return Flux.empty();
+					}
+
 					logger.warn("Unknown media type {} returned for POST in session {}", contentType,
 							sessionRepresentation);
 
